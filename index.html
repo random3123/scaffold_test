@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>표준 강관 비계 설치 시뮬레이터</title>
+    
+    <!-- 온라인 환경에서 3D 엔진 및 컨트롤 로드 -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --error: #ef4444;
+            --info: #3b82f6;
+            --panel-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-light: #6b7280;
+            --border: #e5e7eb;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; 
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: fixed; 
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+
+        /* --- View Visibility --- */
+        .view-container {
+            display: none; 
+            width: 100%;
+            height: 100%;
+            justify-content: center;
+            align-items: center;
+        }
+        .view-container.active {
+            display: flex;
+        }
+
+        #home-view {
+            background-color: var(--panel-bg);
+            width: 100%;
+            height: 100%;
+        }
+
+        /* --- Home View --- */
+        .home-box {
+            background: var(--panel-bg);
+            padding: 50px 30px;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            width: 90%; 
+            max-width: 600px;
+            max-height: 95vh;
+            overflow-y: auto;
+        }
+        .home-icon { font-size: 4rem; margin-bottom: 20px; }
+        .home-title { font-size: 2rem; font-weight: 800; color: var(--text-main); margin-bottom: 30px; word-break: keep-all; line-height: 1.3; }
+        
+        .btn-start {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px 40px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            width: 100%;
+            max-width: 320px;
+        }
+        .btn-start:hover { background-color: var(--primary-hover); transform: translateY(-2px); box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4); }
+
+        .btn-ghost {
+            background-color: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            padding: 14px 40px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 12px;
+            width: 100%;
+            max-width: 320px;
+        }
+        .btn-ghost:hover { background-color: rgba(37, 99, 235, 0.05); transform: translateY(-2px); }
+
+        /* --- Simulator Layout --- */
+        .simulator-container {
+            width: 100%;
+            height: 100%;
+            max-width: 1100px;
+            max-height: 95vh; 
+            background: var(--panel-bg);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header { flex-shrink: 0; padding: 20px; border-bottom: 1px solid var(--border); text-align: center; position: relative; z-index: 10; background: var(--panel-bg); }
+        footer { flex-shrink: 0; padding: 15px 20px; border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 16px; background: #f8fafc; position: relative; z-index: 20; }
+
+        .btn-go-home {
+            position: absolute; left: 20px; top: 20px;
+            background: #f3f4f6; border: 1px solid #d1d5db; padding: 8px 16px; border-radius: 6px;
+            cursor: pointer; font-weight: 600; color: #4b5563; transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .btn-go-home:hover { background: #e5e7eb; color: #1f2937; }
+
+        h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 6px; color: var(--text-main); }
+        .subtitle { font-size: 0.9rem; color: var(--text-light); margin-bottom: 12px; }
+
+        .progress-wrapper { width: 100%; max-width: 450px; margin: 0 auto 10px auto; text-align: center; }
+        .progress-text { font-weight: 700; color: #4b5563; font-size: 0.95rem; margin-bottom: 6px; }
+        .progress-container { width: 100%; background: #e5e7eb; height: 10px; border-radius: 10px; overflow: hidden; border: 1px solid #d1d5db; }
+        .progress-bar { width: 0%; height: 100%; background: var(--success); transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        .message-box {
+            padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 1.05rem;
+            transition: all 0.3s ease; background-color: #eff6ff; color: var(--info);
+            border: 1px solid #bfdbfe; word-break: keep-all; display: flex; align-items: center; justify-content: center;
+            height: 80px; overflow-y: auto; 
+        }
+        .message-box.error { background-color: #fef2f2; color: var(--error); border-color: #fecaca; }
+        .message-box.success { background-color: #ecfdf5; color: var(--success); border-color: #a7f3d0; }
+
+        main { display: flex; flex: 1 1 0; min-height: 0; }
+
+        .inventory {
+            width: 280px; padding: 15px; background: #f8fafc; border-right: 1px solid var(--border);
+            display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex-shrink: 0;
+        }
+        .inventory h2 { font-size: 1.1rem; margin-bottom: 5px; color: var(--text-light); text-align: center; }
+
+        .part-btn {
+            padding: 12px 8px; background: white; border: 2px solid var(--border); border-radius: 8px;
+            cursor: pointer; font-size: 0.95rem; font-weight: 600; color: var(--text-main);
+            transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; touch-action: manipulation;
+            text-align: center; word-break: keep-all; line-height: 1.3;
+        }
+        .part-btn:hover { border-color: var(--primary); color: var(--primary); box-shadow: 0 4px 6px rgba(37, 99, 235, 0.1); transform: translateY(-2px); }
+        .part-btn:active { transform: translateY(0); }
+        .part-btn.installed { background-color: #e5e7eb; color: #9ca3af; border-color: #e5e7eb; cursor: pointer; transform: none; box-shadow: none; }
+
+        @keyframes pulse-hint {
+            0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5); border-color: var(--primary); background-color: #eff6ff; }
+            70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); border-color: var(--primary); background-color: #eff6ff; }
+            100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); border-color: var(--primary); background-color: #ffffff; }
+        }
+        .part-btn.next-hint { animation: pulse-hint 1.6s infinite ease-in-out; color: var(--primary); font-weight: 700; }
+
+        .workspace-wrapper { flex: 1 1 0; position: relative; background-color: #f8fbff; cursor: grab; min-height: 0; overflow: hidden; }
+        .workspace-wrapper:active { cursor: grabbing; }
+
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+        .control-hint {
+            position: absolute; bottom: 10px; right: 10px; background: rgba(255, 255, 255, 0.8);
+            padding: 6px 10px; border-radius: 20px; font-size: 0.8rem; color: #4b5563; pointer-events: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); z-index: 10;
+        }
+
+        .spec-overlay {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 16px;
+            width: 280px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            z-index: 10;
+            pointer-events: none; 
+            opacity: 0;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            transform: translateY(-10px);
+        }
+        .spec-overlay.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .spec-overlay h3 {
+            font-size: 1.05rem;
+            color: var(--primary);
+            margin-bottom: 10px;
+            font-weight: 700;
+            padding-right: 24px; 
+        }
+        .spec-overlay ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .spec-overlay li {
+            font-size: 0.9rem;
+            color: var(--text-main);
+            padding-left: 14px;
+            position: relative;
+            line-height: 1.4;
+            word-break: keep-all;
+        }
+        .spec-overlay li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--info);
+            font-weight: bold;
+        }
+
+        .spec-close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            color: #9ca3af;
+            cursor: pointer;
+            pointer-events: auto; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+        .spec-close-btn:hover {
+            color: #4b5563;
+            background-color: #f3f4f6;
+        }
+
+        .spec-restore-btn {
+            display: none; 
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            z-index: 10;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.2s;
+        }
+        .spec-restore-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .control-btn { padding: 12px 24px; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; touch-action: manipulation; }
+        .btn-reset { background-color: #e5e7eb; color: var(--text-main); }
+        .btn-reset:hover { background-color: #d1d5db; }
+        .btn-hint { background-color: var(--primary); color: white; flex: 1; max-width: 300px; }
+        .btn-hint:hover { background-color: var(--primary-hover); }
+
+        /* --- Modal CSS --- */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center;
+        }
+        .modal-content {
+            background: white; padding: 25px; border-radius: 12px; max-width: 600px; width: 90%; max-height: 85vh;
+            display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+        .modal-content.small { max-width: 400px; text-align: center; }
+        
+        .modal-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 15px; border-bottom: 2px solid var(--border); padding-bottom: 10px; text-align: center; }
+        .modal-body { overflow-y: auto; flex: 1; text-align: left; padding-right: 10px; margin-bottom: 15px; }
+        
+        .modal-item { margin-bottom: 20px; border-bottom: 1px dashed var(--border); padding-bottom: 15px; }
+        .modal-item:last-child { border-bottom: none; }
+        .modal-name-wrapper { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .modal-name { font-weight: 700; font-size: 1.05rem; color: var(--text-main); }
+        .color-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.15); display: inline-block; }
+        .modal-desc { font-size: 0.95rem; color: #4b5563; line-height: 1.5; word-break: keep-all; margin-bottom: 8px; }
+        
+        .legal-basis { display: inline-block; background-color: #f1f5f9; color: #475569; font-size: 0.8rem; font-weight: 600; padding: 4px 8px; border-radius: 4px; margin-bottom: 8px; }
+        .warning-text { color: #dc2626; font-size: 0.85rem; font-weight: 600; margin-top: 8px; background-color: #fef2f2; padding: 10px; border-radius: 6px; border-left: 4px solid #ef4444; line-height: 1.4; }
+
+        .process-step { background-color: #f8fafc; padding: 12px 15px; border-radius: 8px; border-left: 4px solid var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .process-step-title { font-weight: 700; color: var(--primary); margin-bottom: 6px; font-size: 1rem; }
+        .process-arrow { text-align: center; color: #9ca3af; font-size: 1.5rem; margin: 6px 0; animation: bounce 2s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+
+        .btn-modal-close { background: var(--primary); color: white; border: none; padding: 12px; font-size: 1rem; font-weight: 600; border-radius: 6px; cursor: pointer; width: 100%; }
+        .btn-modal-close:hover { background: var(--primary-hover); }
+
+        .custom-modal p { font-size: 1rem; line-height: 1.5; color: var(--text-main); margin-bottom: 20px; white-space: pre-wrap; }
+        .custom-modal .btn-group { display: flex; gap: 10px; justify-content: center; }
+        .btn-modal-cancel, .btn-modal-confirm { padding: 10px 20px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; flex:1;}
+        .btn-modal-cancel { background: #e5e7eb; color: var(--text-main); }
+        .btn-modal-confirm { background: var(--primary); color: white; }
+
+        /* =========================================
+           반응형 (Mobile) - 1화면 꽉 참 고정
+           ========================================= */
+        @media (max-width: 768px) {
+            .view-container { padding: 0; }
+
+            .home-box {
+                position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+                width: 100%; max-width: none; height: 100%; max-height: none;
+                border-radius: 0; box-shadow: none; display: flex; flex-direction: column;
+                justify-content: center; align-items: center; padding: 20px 15px;
+                background-color: var(--panel-bg);
+            }
+            .btn-start, .btn-ghost { max-width: 100%; width: 100%; }
+
+            .simulator-container { width: 100%; max-width: none; height: 100%; max-height: none; border-radius: 0; box-shadow: none; border: none; }
+            
+            header { padding: 10px 15px; }
+            h1 { font-size: 1.1rem; margin-top: 30px; margin-bottom: 5px; } 
+            .btn-go-home { top: 10px; left: 10px; padding: 6px 10px; font-size: 0.8rem; }
+            .subtitle { display: none; } 
+            
+            .progress-wrapper { margin-bottom: 6px; width: 100%; max-width: 100%; }
+            .progress-text { font-size: 0.85rem; margin-bottom: 4px; }
+            .message-box { font-size: 0.85rem; padding: 8px 12px; height: 65px; width: 100%; }
+
+            main { flex-direction: column; flex: 1 1 0; min-height: 0; width: 100%; }
+            
+            .inventory { 
+                width: 100%; border-right: none; border-bottom: 1px solid var(--border); 
+                display: flex; flex-direction: row; flex-wrap: nowrap; overflow-x: auto; 
+                padding: 10px; gap: 8px; -webkit-overflow-scrolling: touch; scrollbar-width: none; 
+            }
+            .inventory::-webkit-scrollbar { display: none; }
+            .inventory h2 { display: none; } 
+            
+            .part-btn { flex: 0 0 90px; padding: 6px 4px; font-size: 0.75rem; height: 55px; }
+
+            .workspace-wrapper { width: 100%; flex: 1 1 0; min-height: 0; }
+            
+            .spec-overlay { width: auto; left: 15px; right: 15px; top: 10px; padding: 12px; }
+            .spec-overlay h3 { font-size: 0.95rem; margin-bottom: 8px; }
+            .spec-overlay li { font-size: 0.85rem; }
+
+            .spec-restore-btn { top: 10px; right: 15px; padding: 6px 12px; font-size: 0.85rem; }
+
+            footer { padding: 10px 15px; flex-direction: row; gap: 10px; width: 100%; }
+            .control-btn { padding: 10px 15px; font-size: 0.9rem; flex: 1; }
+            .btn-hint { max-width: none; }
+        }
+
+        @media (max-width: 480px) {
+            .home-icon { font-size: 4.5rem; margin-bottom: 15px; }
+            .home-title { font-size: 1.6rem; margin-bottom: 25px; word-break: keep-all; line-height: 1.3; }
+            .btn-start { font-size: 1.15rem; padding: 16px 10px; }
+            .btn-ghost { font-size: 1.05rem; padding: 14px 10px; }
+
+            h1 { font-size: 1.05rem; }
+            .message-box { font-size: 0.8rem; }
+            .part-btn { flex: 0 0 85px; font-size: 0.7rem; height: 50px; }
+            footer { gap: 8px; padding: 8px 10px; }
+            .control-btn { padding: 8px; font-size: 0.85rem; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ==========================================
+     1. 커스텀 확인 모달 창
+     ========================================== -->
+<div id="custom-modal" class="modal-overlay">
+    <div class="modal-content small custom-modal">
+        <p id="modal-text"></p>
+        <div class="btn-group">
+            <button id="modal-btn-cancel" class="btn-modal-cancel">취소</button>
+            <button id="modal-btn-confirm" class="btn-modal-confirm">확인</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==========================================
+     2. 자재 용어 사전 모달 창
+     ========================================== -->
+<div id="glossary-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-title">📖 자재 용어 사전</div>
+        <div class="modal-body">
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #374151;"></span><span class="modal-name">밑받침 철물 (Base Plate)</span></div><div class="modal-desc">비계 기둥 하부에 설치하여 구조물의 하중을 지면에 균등하게 분산시키고 기둥의 침하 및 미끄러짐을 방지하는 기초 부품입니다.</div></div>
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #3b82f6;"></span><span class="modal-name">기둥 (Standard)</span></div><div class="modal-desc">비계 구조물의 세로 축을 형성하여 상부의 모든 작업 하중을 하부 지면으로 수직 전달하는 가장 핵심적인 수직 골조 파이프입니다.</div></div>
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #0ea5e9;"></span><span class="modal-name">밑둥잡이 (Foot Tie)</span></div><div class="modal-desc">비계의 구조적 뒤틀림과 벌어짐을 방지하기 위해 지면과 가장 가까운 밑받침 철물 바로 윗부분에 설치하는 첫 하부 수평 연결재입니다.</div></div>
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #eab308;"></span><span class="modal-name">띠장 (Ledger)</span></div><div class="modal-desc">기둥과 기둥을 가로 방향으로 길게 연결하여 세로 방향의 무너짐을 막고 비계의 전체적인 좌우 측면 강성을 확보하는 주요 수평 부재입니다.</div></div>
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #a855f7;"></span><span class="modal-name">장선 (Transom)</span></div><div class="modal-desc">띠장 위에 엇갈려 가로질러 설치되는 짧은 수평 파이프로, 작업발판이 놓일 공간을 지탱하고 고리를 안정적으로 걸 수 있도록 받쳐줍니다.</div></div>
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #f97316;"></span><span class="modal-name">가새 (Bracing)</span></div><div class="modal-desc">구조물의 수평 방향 변형이나 비틀림, 쓰러짐 저항력을 극대화하기 위해 기둥과 수평재 교차점에 대각선(경사)으로 체결하는 보강재입니다.</div></div>
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #facc15;"></span><span class="modal-name">사다리 (Ladder)</span></div><div class="modal-desc">작업자가 하부에서 작업발판 층으로 안전하게 수직 승강할 수 있도록 비계 내부에 전면 띠장을 축으로 견고하게 결속하는 사다리입니다.</div></div>
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #cbd5e1;"></span><span class="modal-name">작업발판 (Platform)</span></div><div class="modal-desc">작업자가 서서 안전하게 통행하고 이동하며 작업을 수행할 수 있도록 장선 위에 까는 강판 형태의 바닥재로, 후크 고리(빨간색) 구조가 결합되어 있습니다.</div></div>
+            <div class="modal-item"><div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #ef4444;"></span><span class="modal-name">안전난간 (Guardrail)</span></div><div class="modal-desc">발판 위의 작업자가 밖으로 떨어지는(추락) 사고를 방지하기 위해 상부 난간대와 중간 난간대로 구성하여 기둥 안쪽에 설치하는 추락 방지용 울타리입니다.</div></div>
+        </div>
+        <button class="btn-modal-close" onclick="closeGlossary()">닫기</button>
+    </div>
+</div>
+
+<!-- ==========================================
+     3. 표준 설치 기준 모달 창
+     ========================================== -->
+<div id="standards-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-title" style="margin-bottom: 5px; border-bottom: none; padding-bottom: 0;">📏 부품별 표준 설치 기준</div>
+        <div style="font-size: 0.95rem; font-weight: 600; color: #4b5563; text-align: center; padding-bottom: 15px; margin-bottom: 15px; border-bottom: 2px solid var(--border);">(산업안전보건기준에 관한 규칙(약칭:안전보건규칙))</div>
+        <div class="modal-body">
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #374151;"></span><span class="modal-name">밑받침 철물</span></div>
+                <span class="legal-basis">안전보건규칙 제59조 제1호</span>
+                <div class="modal-desc">비계가 무거운 하중을 견디려면 발바닥이 튼튼해야 해요. 흙바닥처럼 푹신한 곳에서는 기둥이 푹 꺼지지 않게 넓은 널빤지(깔판)를 깔고, 그 위에 쇠로 된 신발(밑받침 철물)을 꼭 신겨줘야 합니다.</div>
+                <div class="warning-text">⚠️ 주의: 바닥 수평이 안 맞는다고 파이프 밑에 돌멩이나 나무 쐐기를 고여 고정하면 절대 안 됩니다! 지반이 무너지며 비계 전체가 붕괴할 수 있습니다.</div>
+            </div>
+
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #3b82f6;"></span><span class="modal-name">기둥</span></div>
+                <span class="legal-basis">안전보건규칙 제60조 제1호</span>
+                <div class="modal-desc">건물의 기둥처럼 꼿꼿하게 세워지는 가장 중요한 뼈대예요. 너무 멀리 떨어져 있으면 힘을 못 받기 때문에, 옆으로는 어른 한두 걸음 간격(1.5m~1.8m 이하), 앞뒤로는 1.5m 간격 이하로 촘촘히 세워야 안전합니다.</div>
+                <div class="warning-text">⚠️ 주의: 휘어지거나 녹슬고 찌그러진 불량 파이프는 무게를 견디지 못하고 꺾이므로 절대 사용해서는 안 됩니다.</div>
+            </div>
+
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #0ea5e9;"></span><span class="modal-name">밑둥잡이</span></div>
+                <span class="legal-basis">안전보건규칙 제59조 제1호</span>
+                <div class="modal-desc">기둥을 세우고 나면 아랫도리가 벌어지거나 흔들릴 수 있어요. 그래서 바닥에서 무릎 아래 높이(40cm 이하)에 파이프를 가로로 대고 꽉 묶어, 기둥들이 서로 도망가지 못하게 잡아주는 첫 번째 안전장치입니다.</div>
+                <div class="warning-text">⚠️ 주의: 작업에 방해된다고 밑둥잡이를 임의로 해체하거나 생략하면 기둥 밑부분이 미끄러져 전체가 무너지는 대형 사고로 이어집니다.</div>
+            </div>
+
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #eab308;"></span><span class="modal-name">띠장</span></div>
+                <span class="legal-basis">안전보건규칙 제60조 제2호</span>
+                <div class="modal-desc">기둥들의 허리를 가로로 길게 묶어주는 띠 모양의 파이프예요. 첫 번째 띠장은 사람 키를 넘지 않는 높이(2m 이하)에 설치해서, 전체 뼈대가 흔들리지 않게 꽉 잡아줍니다. 간격 또한 2m 이하를 유지해야 합니다.</div>
+                <div class="warning-text">⚠️ 주의: 파이프를 이어 붙일 때, 연결 부속(연결철물)이 같은 위치에 몰리면 그 부분이 약해지므로 반드시 서로 엇갈리게 배치해야 합니다.</div>
+            </div>
+
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #a855f7;"></span><span class="modal-name">장선</span></div>
+                <span class="legal-basis">안전보건규칙 제60조 및 KOSHA Guide</span>
+                <div class="modal-desc">띠장과 띠장 사이를 앞뒤로 건너지르는 짧은 파이프예요. 이 위에 우리가 밟고 설 '작업발판'이 올라가기 때문에, 발판이 부러지거나 처지지 않게 1.5m 이하 간격으로 촘촘히 깔아줍니다.</div>
+                <div class="warning-text">⚠️ 주의: 장선 파이프가 수평을 이루지 못하고 기울어지면 작업발판이 들떠서 작업자가 중심을 잃고 넘어질 위험이 있습니다.</div>
+            </div>
+
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #f97316;"></span><span class="modal-name">가새</span></div>
+                <span class="legal-basis">안전보건규칙 제59조 제3호 및 KCS 표준시방서</span>
+                <div class="modal-desc">네모난 상자는 옆에서 밀면 찌그러지기 쉽죠? 그래서 뼈대 앞뒤와 양옆에 'X자'나 '/' 모양(40~60도 각도)으로 대각선 파이프를 대어, 태풍이 불어도 비계가 쓰러지지 않게 막아줍니다.</div>
+                <div class="warning-text">⚠️ 주의: 가새는 비계의 쓰러짐을 막는 핵심 부품입니다. 볼트를 느슨하게 조이거나 일부 구간을 빼먹고 조립하면 건물 전체가 도미노처럼 쓰러질 수 있습니다.</div>
+            </div>
+
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #facc15;"></span><span class="modal-name">사다리</span></div>
+                <span class="legal-basis">안전보건규칙 제24조</span>
+                <div class="modal-desc">위층으로 안전하게 올라가기 위한 계단입니다. 발을 헛디디지 않게 발판 간격(25~35cm)을 일정하게 유지하고, 다 올라왔을 때 손으로 잡고 디딜 수 있도록 위층 바닥보다 최소 60cm 이상 위로 쑥 튀어나오게 설치해야 합니다.</div>
+                <div class="warning-text">⚠️ 주의: 사다리를 오르내릴 때는 무거운 자재를 양손에 들고 타면 안 되며, 반드시 양손과 한 발(또는 양발과 한 손)이 항상 사다리에 붙어있는 '3점 지지'를 준수해야 합니다.</div>
+            </div>
+
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #cbd5e1;"></span><span class="modal-name">작업발판</span></div>
+                <span class="legal-basis">안전보건규칙 제56조</span>
+                <div class="modal-desc">작업자가 서서 일하는 은색 바닥판입니다. 발이 빠지거나 공구가 떨어지지 않게 발판 사이 틈새를 손가락 굵기(3cm 이하)로 바짝 붙여 깔고, 강풍에 날아가지 않게 양 끝의 붉은 고리(후크)를 장선에 철컥! 하고 2곳 이상 단단히 걸어야 합니다.</div>
+                <div class="warning-text">⚠️ 주의: 발판 하나가 견딜 수 있는 무게(최대 적재 하중 250kg)를 초과하여 벽돌이나 무거운 자재를 한곳에 무리하게 쌓아두면 발판이 무너져 추락합니다.<br><br>💡 <b>현장 점검 팁:</b> 작업발판 1장의 표준 폭은 400~500mm입니다. 만약 발판이 4장 이상 깔린다면 총 폭이 최소 1.6m(400mm x 4장)가 되어 법적 장선 방향 기둥 간격 기준(1.5m 이하)을 초과하게 됩니다. 즉, 3장이 딱 맞게 들어가야 정상 간격입니다!</div>
+            </div>
+
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #ef4444;"></span><span class="modal-name">안전난간</span></div>
+                <span class="legal-basis">안전보건규칙 제13조</span>
+                <div class="modal-desc">작업자가 실수로 뒤로 넘어져도 밖으로 떨어지지 않게 막아주는 튼튼한 울타리예요. 허리쯤 오는 높이(90~120cm)에 상부 난간대를 치고, 그 중간 무릎 높이에 아랫줄(중간 난간대)을 한 번 더 쳐서 작업자가 틈새로 빠져나가지 않도록 이중으로 보호합니다.</div>
+                <div class="warning-text">⚠️ 주의: 높은 곳에 있는 자재를 잡으려고 안전난간 파이프를 딛고 올라서는 행위는 절대 금지입니다. 난간이 파손되거나 중심을 잃어 추락하는 원인이 됩니다.</div>
+            </div>
+        </div>
+        <button class="btn-modal-close" onclick="closeStandards()">닫기</button>
+    </div>
+</div>
+
+<!-- ==========================================
+     4. 사용 자재 규격 정보 모달 창
+     ========================================== -->
+<div id="specs-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-title">📐 사용 자재 규격 정보</div>
+        <div class="modal-body">
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #9ca3af;"></span><span class="modal-name">강관 파이프 (기둥, 띠장, 장선, 가새 등)</span></div>
+                <div class="modal-desc">• <b>외경(지름):</b> 48.6mm<br>• <b>두께:</b> 2.4mm (또는 2.3mm)<br>• <b>표준 길이:</b> 1.0m, 1.5m, 2.0m, 3.0m, 4.0m, 6.0m 등 기성품 규격 사용<br>• <b>재질:</b> 인장강도 400N/mm² 이상의 일반 구조용 탄소 강관 (KS F 8002 기준)</div>
+            </div>
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #22c55e;"></span><span class="modal-name">작업발판 (안전발판)</span></div>
+                <div class="modal-desc">• <b>규격(폭×길이):</b> 폭 400mm (또는 500mm) × 길이 1,829mm 표준 사용<br>• <b>허용 하중:</b> 최대 적재 하중 250kg 이하<br>• <b>특징:</b> 표면 미끄럼 방지 처리, 양 끝단에 장선 이탈 방지용 후크(고리) 4개 부착</div>
+            </div>
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #64748b;"></span><span class="modal-name">클램프 (Clamp)</span></div>
+                <div class="modal-desc">• <b>사용 규격:</b> 강관 외경 48.6mm 전용<br>• <b>직교형:</b> 90도 교차 부위 사용 / <b>회전형:</b> 대각선(가새) 교차 부위 사용<br>• <b>체결 토크:</b> 약 350kgf·cm</div>
+            </div>
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #374151;"></span><span class="modal-name">밑받침 철물 (Base Plate)</span></div>
+                <div class="modal-desc">• <b>밑판 규격:</b> 가로·세로 120mm 이상 / 두께 4.5mm 이상<br>• <b>특징:</b> 중앙에 기둥 파이프를 삽입할 수 있는 강관 꽂이 부착</div>
+            </div>
+            <div class="modal-item">
+                <div class="modal-name-wrapper"><span class="color-swatch" style="background-color: #eab308;"></span><span class="modal-name">가설 사다리</span></div>
+                <div class="modal-desc">• <b>폭:</b> 30cm 이상 / <b>발판 간격:</b> 25cm ~ 35cm<br>• <b>재질:</b> 하중을 충분히 견딜 수 있는 견고한 금속제</div>
+            </div>
+        </div>
+        <button class="btn-modal-close" onclick="closeSpecs()">닫기</button>
+    </div>
+</div>
+
+<!-- ==========================================
+     5. 표준 예외 상황 대처 프로세스 모달 창
+     ========================================== -->
+<div id="process-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-title">⚖️ 표준 기준을 지킬 수 없다면?</div>
+        <div class="modal-body">
+            <p style="font-size: 0.95rem; line-height: 1.5; color: var(--text-main); margin-bottom: 15px; word-break: keep-all;">
+                비계는 '표준 설치 기준'에 따라 조립하는 것이 원칙입니다. 하지만 현장에 거대한 배관이 있거나, 무거운 자재를 올려야 해서 부득이하게 기준(기둥 간격 등)을 지킬 수 없는 경우가 생깁니다.<br><br>
+                이때 <b>"내 경험상 이 정도는 괜찮아"라며 마음대로 설치하는 것은 절대 금지</b>입니다! 반드시 아래의 안전 프로세스를 따라야 합니다.
+            </p>
+
+            <div class="process-step">
+                <div class="process-step-title">1단계: 임의 시공 금지 🛑</div>
+                <div class="modal-desc" style="margin-bottom: 0;">표준 규격대로 설치할 수 없다면 즉시 계획을 멈추고 현장 안전 관리자에게 보고합니다.</div>
+            </div>
+            <div class="process-arrow">⬇️</div>
+
+            <div class="process-step">
+                <div class="process-step-title">2단계: 구조계산 의뢰 📐</div>
+                <div class="modal-desc" style="margin-bottom: 0;">가설구조물 전문가(구조기술사 등)에게 현재 현장 상황과 하중을 전달하여, 뼈대가 무너지지 않고 버틸 수 있는지 수학적으로 검토(구조계산)를 받습니다.</div>
+            </div>
+            <div class="process-arrow">⬇️</div>
+
+            <div class="process-step">
+                <div class="process-step-title">3단계: 특화 조립도 승인 📝</div>
+                <div class="modal-desc" style="margin-bottom: 0;">구조계산을 통해 안전이 증명되면, 우리 현장만을 위한 '새로운 비계 조립 도면'을 공식적으로 승인받습니다.</div>
+            </div>
+            <div class="process-arrow">⬇️</div>
+
+            <div class="process-step">
+                <div class="process-step-title">4단계: 도면 기반 시공 👷‍♂️</div>
+                <div class="modal-desc" style="margin-bottom: 0;">이제부터는 표준 기준이 아닌, 새롭게 승인된 도면을 절대적인 기준으로 삼아 안전하게 시공합니다.</div>
+            </div>
+        </div>
+        <button class="btn-modal-close" onclick="closeProcess()">닫기</button>
+    </div>
+</div>
+
+<!-- ==========================================
+     화면 1: 첫 화면 (홈 뷰)
+     ========================================== -->
+<div id="home-view" class="view-container active">
+    <div class="home-box">
+        <div class="home-icon">👷‍♂️🛠️</div>
+        <h1 class="home-title">표준 강관 비계 설치<br>시뮬레이터</h1>
+        <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <button class="btn-start" onclick="startSimulator()">실습 실행하기 ▶</button>
+            <button class="btn-ghost" onclick="showGlossary()">자재 용어 사전 보기 📖</button>
+            <button class="btn-ghost" onclick="showStandards()">표준 설치 기준 보기 📏</button>
+            <button class="btn-ghost" onclick="showSpecs()">사용 자재 규격 정보 📐</button>
+            <button class="btn-ghost" onclick="showProcess()">표준 예외 상황 대처법 ⚖️</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==========================================
+     화면 2: 실습 화면 (시뮬레이터 뷰)
+     ========================================== -->
+<div id="simulator-view" class="view-container">
+    <div class="simulator-container">
+        <header>
+            <button class="btn-go-home" onclick="goHome()">⬅ 홈으로</button>
+            <h1>표준 강관 비계 설치 시뮬레이터</h1>
+            
+            <div class="progress-wrapper">
+                <div id="progress-text" class="progress-text">진행도: 0 / 9 단계 (0%)</div>
+                <div class="progress-container">
+                    <div id="progress-bar" class="progress-bar"></div>
+                </div>
+            </div>
+
+            <div id="message-box" class="message-box">아래 인벤토리에서 깜빡이는 힌트 버튼을 눌러 실습을 시작해보세요! 👇</div>
+        </header>
+
+        <main>
+            <div class="inventory">
+                <h2>부품 인벤토리</h2>
+                <!-- 부품 버튼 클릭 시 현재 단계 치수가 표시됩니다 -->
+                <button class="part-btn" data-id="base">밑받침 철물<br>(바닥 받침대)</button>
+                <button class="part-btn" data-id="standard">기둥<br>(수직 뼈대 파이프)</button>
+                <button class="part-btn" data-id="foottie">밑둥잡이 & 클램프<br>(하단 고정대)</button>
+                <button class="part-btn" data-id="ledger">띠장 & 클램프<br>(가로 연결 파이프)</button>
+                <button class="part-btn" data-id="transom">장선 & 클램프<br>(발판 받침 파이프)</button>
+                <button class="part-btn" data-id="bracing">가새 & 클램프 (4면)<br>(대각선 보강재)</button>
+                <button class="part-btn" data-id="ladder">사다리<br>(안전 이동 통로)</button>
+                <button class="part-btn" data-id="platform">작업발판<br>(은색 안전 바닥판)</button>
+                <button class="part-btn" data-id="guardrail">안전난간<br>(추락 방지 울타리)</button>
+            </div>
+
+            <div class="workspace-wrapper">
+                <div id="canvas-container"></div>
+                <!-- 안내 문구 -->
+                <div class="control-hint">👆 부품에 마우스를 올리거나 터치하면 규격이 보입니다!</div>
+                
+                <!-- 오버레이 복구(켜기) 버튼 -->
+                <button id="spec-restore-btn" class="spec-restore-btn" onclick="toggleSpecOverlay()">💡 기준 켜기</button>
+
+                <!-- 부품 호버/클릭 시 나타나는 주요 기준 오버레이 패널 -->
+                <div id="spec-overlay" class="spec-overlay">
+                    <!-- 오버레이 끄기 버튼 -->
+                    <button class="spec-close-btn" onclick="toggleSpecOverlay()">&#10006;</button>
+                    <h3>💡 주요 설치 기준</h3>
+                    <ul id="spec-list"></ul>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <button class="control-btn btn-reset" onclick="resetSimulator()">초기화</button>
+            <button class="control-btn btn-hint" onclick="showHint()">올바른 조립 순서 보기</button>
+        </footer>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 앱 핵심 로직 및 전역 상태 관리
+    // ==========================================
+    
+    // 치수선 그룹 관리 및 레이캐스팅 변수
+    let dimensionGroups = {};
+    let currentRenderPartId = null;
+    let lastInstalledPartId = null;
+    let currentHoveredPartId = null;
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // 오버레이 패널 ON/OFF 유저 설정 상태 
+    let isSpecVisibleUserPref = true; 
+
+    // 부품별 오버레이 패널 데이터
+    const partSpecs = {
+        'base': ['밑받침 철물, 깔판 필수 사용', '지반 침하 및 미끄러짐 방지'],
+        'standard': ['띠장 방향 간격: 1.5m ~ 1.8m 이하', '장선 방향 간격: 1.5m 이하'],
+        'foottie': ['지면으로부터 400mm 이하에 설치', '기둥 하단부 벌어짐 방지'],
+        'ledger': ['수직 간격: 2.0m 이하', '연결 철물은 엇갈리게 배치'],
+        'transom': ['간격: 1.5m 이하', '작업발판을 지지할 수 있도록 평행 유지'],
+        'bracing': ['수평면에 대해 40°~60° 각도로 설치', '비계의 전면, 후면, 양 측면에 모두 설치'],
+        'ladder': ['발판 간격: 250mm ~ 350mm', '작업발판 위로 600mm 이상 돌출되게 설치'],
+        'platform': [
+            '발판 틈새: 30mm 이하', 
+            '최대 적재하중: 250kg 초과 금지', 
+            '뒤집힘 방지 훅(2곳 이상) 완벽 체결', 
+            '💡 [점검 팁] 발판(폭 400~500mm)이 4장 이상 들어가면 총 폭이 최소 1.6m가 되어 기둥 간격 기준(1.5m 이하) 초과 불량!'
+        ],
+        'guardrail': [
+            '상부 난간대: 900mm ~ 1200mm', 
+            '중간 난간대: 450mm ~ 600mm', 
+            '[중요] 밖으로 밀리는 추락 하중을 기둥이 버티도록 반드시 기둥 안쪽에 설치',
+            '임의로 밟거나 딛고 작업 절대 금지'
+        ]
+    };
+
+    function showModal(text, onConfirm, showCancel = true) {
+        const modal = document.getElementById('custom-modal');
+        const textEl = document.getElementById('modal-text');
+        const btnCancel = document.getElementById('modal-btn-cancel');
+        const btnConfirm = document.getElementById('modal-btn-confirm');
+
+        textEl.textContent = text;
+        btnCancel.style.display = showCancel ? 'block' : 'none';
+        modal.style.display = 'flex';
+
+        btnConfirm.onclick = () => {
+            modal.style.display = 'none';
+            if(onConfirm) onConfirm();
+        };
+        btnCancel.onclick = () => { modal.style.display = 'none'; };
+    }
+
+    function showGlossary() { document.getElementById('glossary-modal').style.display = 'flex'; }
+    function closeGlossary() { document.getElementById('glossary-modal').style.display = 'none'; }
+    function showStandards() { document.getElementById('standards-modal').style.display = 'flex'; }
+    function closeStandards() { document.getElementById('standards-modal').style.display = 'none'; }
+    function showSpecs() { document.getElementById('specs-modal').style.display = 'flex'; }
+    function closeSpecs() { document.getElementById('specs-modal').style.display = 'none'; }
+    function showProcess() { document.getElementById('process-modal').style.display = 'flex'; }
+    function closeProcess() { document.getElementById('process-modal').style.display = 'none'; }
+
+    function startSimulator() {
+        document.getElementById('home-view').classList.remove('active');
+        document.getElementById('simulator-view').classList.add('active');
+
+        setTimeout(() => {
+            if (!scene) {
+                init3D();
+            } else {
+                onWindowResize(); 
+            }
+            updateGlowAndProgress();
+        }, 50);
+    }
+
+    function goHome() {
+        showModal("첫 화면으로 돌아가시겠습니까?\n현재 진행 중인 실습 내용은 초기화됩니다.", () => {
+            resetSimulator(); 
+            document.getElementById('simulator-view').classList.remove('active');
+            document.getElementById('home-view').classList.add('active');
+        }, true);
+    }
+
+    function updateGlowAndProgress() {
+        partButtons.forEach(btn => btn.classList.remove('next-hint'));
+        
+        const percent = Math.round((currentStep / sequence.length) * 100);
+        document.getElementById('progress-bar').style.width = percent + '%';
+        document.getElementById('progress-text').textContent = `진행도: ${currentStep} / ${sequence.length} 단계 (${percent}%)`;
+        
+        if (currentStep < sequence.length) {
+            const nextId = sequence[currentStep].id;
+            const nextBtn = document.querySelector(`.part-btn[data-id="${nextId}"]`);
+            if (nextBtn) {
+                nextBtn.classList.add('next-hint');
+                nextBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+        }
+    }
+
+    // --- 치수선(Dimension) 렌더링 상태 컨트롤 함수 ---
+    function hideAllDimensions() {
+        for (const pid in dimensionGroups) {
+            dimensionGroups[pid].forEach(group => {
+                group.visible = false;
+            });
+        }
+    }
+
+    function showDimension(partId) {
+        hideAllDimensions();
+        if (dimensionGroups[partId]) {
+            dimensionGroups[partId].forEach(group => {
+                group.visible = true;
+            });
+        }
+    }
+
+    // 오버레이 ON/OFF 토글 로직
+    function toggleSpecOverlay() {
+        isSpecVisibleUserPref = !isSpecVisibleUserPref; // 설정 반전
+        const targetPartId = currentHoveredPartId || lastInstalledPartId;
+        updateSpecOverlay(targetPartId); // 설정에 맞게 UI 갱신
+    }
+
+    // 오버레이 패널 상태 업데이트 함수
+    function updateSpecOverlay(partId) {
+        const overlay = document.getElementById('spec-overlay');
+        const list = document.getElementById('spec-list');
+        const restoreBtn = document.getElementById('spec-restore-btn');
+        
+        if(!partId) {
+            overlay.classList.remove('show');
+            restoreBtn.style.display = 'none';
+            return;
+        }
+
+        const specs = partSpecs[partId];
+        if(specs) {
+            list.innerHTML = specs.map(spec => `<li>${spec}</li>`).join('');
+            
+            // 유저가 켜둔 상태면 오버레이 표시, 복구 버튼 숨김
+            if (isSpecVisibleUserPref) {
+                overlay.classList.add('show');
+                restoreBtn.style.display = 'none';
+            } 
+            // 유저가 꺼둔 상태면 오버레이 숨김, 복구 버튼 표시
+            else {
+                overlay.classList.remove('show');
+                restoreBtn.style.display = 'block';
+            }
+        } else {
+            overlay.classList.remove('show');
+            restoreBtn.style.display = 'none';
+        }
+    }
+
+    const sequence = [
+        { id: 'base', name: '밑받침 철물' },
+        { id: 'standard', name: '기둥' },
+        { id: 'foottie', name: '밑둥잡이 및 클램프' },
+        { id: 'ledger', name: '띠장 및 클램프' },
+        { id: 'transom', name: '장선 및 클램프' },
+        { id: 'bracing', name: '가새 및 클램프' },
+        { id: 'ladder', name: '사다리' },
+        { id: 'platform', name: '작업발판' },
+        { id: 'guardrail', name: '안전난간' }
+    ];
+
+    const friendlyExplanations = [
+        "🎉 밑받침 철물 설치 완료! 구조물이 땅 속으로 파묻히거나 옆으로 부드럽게 쓰러지지 않도록 단단히 지탱해주는 받침대예요.",
+        "🎉 수직 기둥 설치 완료! 위에서 가해지는 무게를 지면으로 전달하는 비계 구조물의 튼튼한 '척추 뼈'예요.",
+        "🎉 밑둥잡이 체결 완료! 기둥들의 아랫부분이 양옆으로 벌어지거나 뒤틀리지 않게 바닥 근처에서 꽉 묶어줘요.",
+        "🎉 띠장 체결 완료! 기둥 사이를 가로로 연결해서 뼈대가 좌우로 흔들리는 것을 강력하게 방지해줍니다.",
+        "🎉 장선 체결 완료! 곧 조립할 '작업발판'이 떨어지지 않고 공중에 평평하게 얹어질 수 있도록 받쳐주는 파이프예요.",
+        "🎉 4면 가새 체결 완료! 사각형 뼈대에 대각선 보강재를 덧대어 건물이 바람에 쓰러지지 않게 해주는 핵심 안전장치예요.",
+        "🎉 수직 승강 사다리 설치 완료! 외부로 위험하게 매달리지 않고 비계 내부에서 발판 층까지 안전하게 오르내릴 수 있어요.",
+        "🎉 작업발판 배치 완료! (💡 현장 팁: 400~500mm 발판이 4장 이상 들어가면 총 폭이 1.6m를 넘어 장선 간격 기준(1.5m 이하) 위반입니다. 3장이 딱 맞게 들어가야 합격!)",
+        "축하합니다! 안전 기준에 완벽하게 부합하는 3D 강관 비계 조립을 성공적으로 마쳤습니다. 👷‍♂️🎉"
+    ];
+
+    let currentStep = 0; 
+    let activeParts = []; 
+
+    const messageBox = document.getElementById('message-box');
+    const partButtons = document.querySelectorAll('.part-btn');
+
+    partButtons.forEach(btn => {
+        btn.addEventListener('click', () => handlePartClick(btn));
+    });
+
+    function handlePartClick(button) {
+        const partId = button.getAttribute('data-id');
+        const partName = button.innerText;
+
+        // 이미 설치 완료된 부품의 버튼을 다시 클릭하면 해당 부품의 치수와 정보 고정
+        if (button.classList.contains('installed')) {
+            lastInstalledPartId = partId; // 마지막 포커스 변경
+            showDimension(partId);
+            updateSpecOverlay(partId);
+            return;
+        }
+
+        if (currentStep >= sequence.length) return;
+
+        const expectedPart = sequence[currentStep];
+
+        if (partId === expectedPart.id) {
+            currentRenderPartId = partId; 
+            render3DPart(partId);
+            currentRenderPartId = null;
+
+            lastInstalledPartId = partId; // 방금 조립한 부품을 현재 포커스로 등록
+            showDimension(partId);
+            updateSpecOverlay(partId);
+
+            button.classList.add('installed');
+            
+            if (currentStep === sequence.length - 1) {
+                showMessage(friendlyExplanations[currentStep], "success");
+            } else {
+                showMessage(friendlyExplanations[currentStep], "info");
+            }
+
+            currentStep++;
+            updateGlowAndProgress(); 
+        } else {
+            const requiredPartName = expectedPart.name;
+            showMessage(`경고: 올바른 조립 순서가 아닙니다! (설치해야 할 부품: ${requiredPartName})`, "error");
+        }
+    }
+
+    function showMessage(msg, type) {
+        messageBox.textContent = msg;
+        messageBox.className = 'message-box';
+        messageBox.classList.add(type);
+        setTimeout(onWindowResize, 10);
+    }
+
+    function showHint() {
+        const orderText = sequence.map((step, index) => `${index + 1}. ${step.name}`).join(' ➔ ');
+        showModal(`[안전 기준 올바른 조립 순서]\n\n${orderText}\n\n반드시 하부구조부터 상부구조, 수직에서 수평, 그리고 구조적 안정성을 위한 가새 순으로 조립해야 합니다.`, null, false);
+    }
+
+    function resetSimulator() {
+        currentStep = 0;
+        
+        activeParts.forEach(mesh => scene.remove(mesh));
+        activeParts = [];
+        dimensionGroups = {}; 
+        lastInstalledPartId = null;
+        currentHoveredPartId = null;
+        
+        updateDimensionVisibility(null);
+        updateSpecOverlay(null);
+
+        partButtons.forEach(btn => btn.classList.remove('installed'));
+        showMessage("아래 인벤토리에서 깜빡이는 힌트 버튼을 눌러 실습을 시작해보세요! 👇", "info");
+
+        if (camera && controls) {
+            camera.position.set(5, 4, 6);
+            controls.target.set(0, 1.2, 0);
+            controls.update();
+        }
+        
+        updateGlowAndProgress(); 
+    }
+
+
+    // ==========================================
+    // 3. Three.js 3D 환경 구축 및 레이캐스터(호버/클릭)
+    // ==========================================
+    let scene, camera, renderer, controls;
+    const container = document.getElementById('canvas-container');
+
+    function init3D() {
+        const width = container.clientWidth || 600;
+        const height = container.clientHeight || 400;
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color('#f8fbff');
+
+        const aspect = width / height;
+        camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
+        camera.position.set(5, 4, 6); 
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
+        
+        container.innerHTML = '';
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
+        
+        const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+        dirLight2.position.set(-5, 5, -7);
+        scene.add(dirLight2);
+
+        const gridHelper = new THREE.GridHelper(10, 20, 0x94a3b8, 0xe2e8f0);
+        scene.add(gridHelper);
+
+        const groundGeo = new THREE.PlaneGeometry(10, 10);
+        const groundMat = new THREE.MeshStandardMaterial({ color: '#f8fbff', depthWrite: false, transparent: true, opacity: 0.5 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true; 
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 1.2, 0); 
+        controls.maxPolarAngle = Math.PI / 2 + 0.1; 
+
+        // 윈도우 리사이즈 및 마우스/터치 상호작용 이벤트 등록
+        window.addEventListener('resize', onWindowResize);
+        container.addEventListener('pointermove', onPointerMove);
+        container.addEventListener('click', onCanvasClick);
+
+        animate();
+    }
+
+    // 마우스 호버(Hover) 시 레이캐스트로 부품 찾기
+    function onPointerMove(event) {
+        if(!renderer) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+
+        // 자식 객체들까지 모두 검색 (true)
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        
+        let hoveredPartId = null;
+        for (let i = 0; i < intersects.length; i++) {
+            const obj = intersects[i].object;
+            // userData.partId가 부여된 메쉬만 타겟팅 (바닥이나 빛은 무시)
+            if (obj.userData && obj.userData.partId) {
+                hoveredPartId = obj.userData.partId;
+                break;
+            }
+        }
+
+        // 호버 대상이 바뀌었을 때만 DOM과 3D 뷰 갱신
+        if (hoveredPartId !== currentHoveredPartId) {
+            currentHoveredPartId = hoveredPartId;
+            
+            // 허공으로 마우스를 빼면 마지막으로 클릭했던(설치했던) 부품 치수로 돌아감
+            const targetPartId = hoveredPartId || lastInstalledPartId;
+            
+            showDimension(targetPartId);
+            updateSpecOverlay(targetPartId);
+            
+            // 마우스를 올렸을 때 커서 모양 변경
+            if (hoveredPartId) {
+                container.style.cursor = 'pointer';
+            } else {
+                container.style.cursor = 'grab';
+            }
+        }
+    }
+
+    // 화면 터치(Click) 시 해당 부품에 정보창 고정하기
+    function onCanvasClick(event) {
+        if (currentHoveredPartId) {
+            lastInstalledPartId = currentHoveredPartId;
+            showDimension(lastInstalledPartId);
+            updateSpecOverlay(lastInstalledPartId);
+        }
+    }
+
+    function updateDimensionVisibility(activePartId) {
+        showDimension(activePartId);
+    }
+
+    function onWindowResize() {
+        if (!camera || !renderer) return;
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        controls.update(); 
+
+        activeParts.forEach(obj => {
+            const targetScale = obj.userData.targetScale || new THREE.Vector3(1, 1, 1);
+            if (obj.scale.x < targetScale.x * 0.99) {
+                obj.scale.x += (targetScale.x - obj.scale.x) * 0.15; 
+                obj.scale.y += (targetScale.y - obj.scale.y) * 0.15;
+                obj.scale.z += (targetScale.z - obj.scale.z) * 0.15;
+            } else if (obj.scale.x !== targetScale.x) {
+                obj.scale.copy(targetScale);
+            }
+        });
+
+        renderer.render(scene, camera);
+    }
+
+
+    // ==========================================
+    // 4. 비계 부품 3D 모델링 및 굵은 치수선(Dimension) 로직
+    // ==========================================
+    const materials = {
+        base: new THREE.MeshStandardMaterial({ color: 0x374151, metalness: 0.5, roughness: 0.5 }), 
+        standard: new THREE.MeshStandardMaterial({ color: 0x3b82f6, metalness: 0.7, roughness: 0.3 }), 
+        foottie: new THREE.MeshStandardMaterial({ color: 0x0ea5e9, metalness: 0.7, roughness: 0.3 }), 
+        ledger: new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.7, roughness: 0.3 }), 
+        transom: new THREE.MeshStandardMaterial({ color: 0xa855f7, metalness: 0.7, roughness: 0.3 }), 
+        bracing: new THREE.MeshStandardMaterial({ color: 0xf97316, metalness: 0.6, roughness: 0.4 }), 
+        platform: new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.6, roughness: 0.4 }), 
+        hook: new THREE.MeshStandardMaterial({ color: 0xff0000, metalness: 0.8, roughness: 0.2 }), 
+        guardrail: new THREE.MeshStandardMaterial({ color: 0xef4444, metalness: 0.5, roughness: 0.3 }), 
+        ladder: new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.4, roughness: 0.4 }), 
+        clamp: new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9, roughness: 0.2 }) 
+    };
+
+    function addMesh(geometry, material, x, y, z, rotX = 0, rotY = 0, rotZ = 0) {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
+        mesh.rotation.set(rotX, rotY, rotZ);
+        mesh.scale.set(0.01, 0.01, 0.01); 
+
+        // 마우스 호버 인식을 위해 메쉬에 파트 ID 태깅
+        if (currentRenderPartId) {
+            mesh.userData.partId = currentRenderPartId;
+        }
+
+        scene.add(mesh);
+        activeParts.push(mesh);
+        return mesh;
+    }
+
+    function addClamp(x, y, z, rotX, rotY, rotZ) {
+        const clampGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+        addMesh(clampGeo, materials.clamp, x, y, z, rotX, rotY, rotZ);
+    }
+
+    // --- 치수선(Dimension Line) 생성 모듈 ---
+    // 얇은 선 대신 눈에 띄게 굵은 '원기둥(Cylinder)'을 이용해 3D 선형 구현
+    function createThickLine(pStart, pEnd, colorHex) {
+        const distance = pStart.distanceTo(pEnd);
+        // 선의 두께(반경)를 0.015로 굵게 설정
+        const geo = new THREE.CylinderGeometry(0.015, 0.015, distance, 8);
+        const mat = new THREE.MeshBasicMaterial({ color: colorHex, depthTest: false }); // 무조건 앞에 보이게
+        const mesh = new THREE.Mesh(geo, mat);
+
+        const mid = new THREE.Vector3().addVectors(pStart, pEnd).multiplyScalar(0.5);
+        mesh.position.copy(mid);
+
+        // 원기둥 방향 정렬
+        const dir = new THREE.Vector3().subVectors(pEnd, pStart).normalize();
+        const up = new THREE.Vector3(0, 1, 0);
+        mesh.quaternion.setFromUnitVectors(up, dir);
+        
+        mesh.renderOrder = 999;
+        return mesh;
+    }
+
+    function createTextSprite(text) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 8;
+        ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+        ctx.font = 'bold 44px sans-serif';
+        ctx.fillStyle = '#ef4444';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2 + 4);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false }); 
+        const sprite = new THREE.Sprite(spriteMat);
+        return sprite;
+    }
+
+    function addDimension(p1, p2, text, offsetDir, offsetDist) {
+        const offset = offsetDir.clone().normalize().multiplyScalar(offsetDist);
+        const p1Off = p1.clone().add(offset);
+        const p2Off = p2.clone().add(offset);
+
+        // 얇은 Line 대신 굵은 원기둥(Cylinder) 메쉬로 생성
+        const lineMain = createThickLine(p1Off, p2Off, 0xef4444);
+        const lineG1 = createThickLine(p1, p1Off, 0xef4444);
+        const lineG2 = createThickLine(p2, p2Off, 0xef4444);
+
+        const sprite = createTextSprite(text);
+        sprite.scale.set(1.0, 0.25, 1);
+        const mid = new THREE.Vector3().addVectors(p1Off, p2Off).multiplyScalar(0.5);
+        sprite.position.copy(mid).add(offsetDir.clone().normalize().multiplyScalar(0.15));
+        sprite.renderOrder = 1000;
+
+        const group = new THREE.Group();
+        group.add(lineMain);
+        group.add(lineG1);
+        group.add(lineG2);
+        group.add(sprite);
+
+        group.scale.set(0.01, 0.01, 0.01);
+        scene.add(group);
+        activeParts.push(group);
+
+        // 생성된 치수선 그룹을 현재 파트 ID의 배열에 삽입 & 파트 ID 태깅
+        if (currentRenderPartId) {
+            group.children.forEach(c => c.userData.partId = currentRenderPartId);
+            if (!dimensionGroups[currentRenderPartId]) dimensionGroups[currentRenderPartId] = [];
+            dimensionGroups[currentRenderPartId].push(group);
+        }
+    }
+
+    function addLabelSprite(pos, text) {
+        const sprite = createTextSprite(text);
+        sprite.scale.set(1.0, 0.25, 1);
+        
+        const group = new THREE.Group();
+        group.position.copy(pos);
+        sprite.position.set(0,0,0);
+        group.add(sprite);
+
+        group.scale.set(0.01, 0.01, 0.01);
+        scene.add(group);
+        activeParts.push(group);
+
+        if (currentRenderPartId) {
+            group.children.forEach(c => c.userData.partId = currentRenderPartId);
+            if (!dimensionGroups[currentRenderPartId]) dimensionGroups[currentRenderPartId] = [];
+            dimensionGroups[currentRenderPartId].push(group);
+        }
+    }
+
+    function render3DPart(partId) {
+        const width = 2.0; 
+        const depth = 1.5; 
+        const hW = width / 2; 
+        const hD = depth / 2; 
+
+        switch(partId) {
+            case 'base':
+                const baseGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.05, 16);
+                addMesh(baseGeo, materials.base, -hW, 0.025, -hD);
+                addMesh(baseGeo, materials.base, hW, 0.025, -hD);
+                addMesh(baseGeo, materials.base, -hW, 0.025, hD);
+                addMesh(baseGeo, materials.base, hW, 0.025, hD);
+                break;
+
+            case 'standard':
+                const stdHeight = 2.5;
+                const stdGeo = new THREE.CylinderGeometry(0.04, 0.04, stdHeight, 16);
+                addMesh(stdGeo, materials.standard, -hW, stdHeight/2, -hD);
+                addMesh(stdGeo, materials.standard, hW, stdHeight/2, -hD);
+                addMesh(stdGeo, materials.standard, -hW, stdHeight/2, hD);
+                addMesh(stdGeo, materials.standard, hW, stdHeight/2, hD);
+                
+                addDimension(new THREE.Vector3(-hW, 0.1, hD), new THREE.Vector3(hW, 0.1, hD), '1.5~1.8m 이하', new THREE.Vector3(0, 0, 1), 0.4);
+                addDimension(new THREE.Vector3(hW, 0.1, hD), new THREE.Vector3(hW, 0.1, -hD), '1.5m 이하', new THREE.Vector3(1, 0, 0), 0.4);
+                break;
+
+            case 'foottie':
+                const footLedGeo = new THREE.CylinderGeometry(0.035, 0.035, width + 0.2, 16);
+                addMesh(footLedGeo, materials.foottie, 0, 0.2, -hD - 0.05, 0, 0, Math.PI / 2);
+                addMesh(footLedGeo, materials.foottie, 0, 0.2, hD + 0.05, 0, 0, Math.PI / 2);
+                const footTransGeo = new THREE.CylinderGeometry(0.035, 0.035, depth + 0.2, 16);
+                addMesh(footTransGeo, materials.foottie, -hW - 0.05, 0.25, 0, Math.PI / 2, 0, 0);
+                addMesh(footTransGeo, materials.foottie, hW + 0.05, 0.25, 0, Math.PI / 2, 0, 0);
+
+                addClamp(-hW, 0.2, -hD - 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(hW, 0.2, -hD - 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(-hW, 0.2, hD + 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(hW, 0.2, hD + 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(-hW - 0.025, 0.25, -hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(hW + 0.025, 0.25, -hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(-hW - 0.025, 0.25, hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(hW + 0.025, 0.25, hD, Math.PI/4, 0, Math.PI/4);
+                
+                addDimension(new THREE.Vector3(hW, 0.025, hD), new THREE.Vector3(hW, 0.2, hD), '400mm 이하', new THREE.Vector3(1, 0, 1), 0.4);
+                break;
+
+            case 'ledger':
+                const ledGeo = new THREE.CylinderGeometry(0.035, 0.035, width + 0.2, 16);
+                addMesh(ledGeo, materials.ledger, 0, 1.5, -hD - 0.05, 0, 0, Math.PI / 2);
+                addMesh(ledGeo, materials.ledger, 0, 1.5, hD + 0.05, 0, 0, Math.PI / 2);
+
+                addClamp(-hW, 1.5, -hD - 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(hW, 1.5, -hD - 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(-hW, 1.5, hD + 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(hW, 1.5, hD + 0.025, Math.PI/4, Math.PI/4, 0);
+
+                addDimension(new THREE.Vector3(hW, 0.2, hD), new THREE.Vector3(hW, 1.5, hD), '수직간격 2.0m 이하', new THREE.Vector3(1, 0, 1), 0.4);
+                break;
+
+            case 'transom':
+                const transGeo = new THREE.CylinderGeometry(0.035, 0.035, depth + 0.2, 16);
+                addMesh(transGeo, materials.transom, -hW - 0.05, 1.55, 0, Math.PI / 2, 0, 0);
+                addMesh(transGeo, materials.transom, hW + 0.05, 1.55, 0, Math.PI / 2, 0, 0);
+
+                addClamp(-hW - 0.025, 1.55, -hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(hW + 0.025, 1.55, -hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(-hW - 0.025, 1.55, hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(hW + 0.025, 1.55, hD, Math.PI/4, 0, Math.PI/4);
+                
+                addDimension(new THREE.Vector3(hW, 1.55, hD), new THREE.Vector3(-hW, 1.55, hD), '간격 1.5m 이하', new THREE.Vector3(0, 1, 1), 0.3);
+                break;
+
+            case 'bracing':
+                const heightDiff = 1.2; 
+                const yCenter = 0.9;    
+
+                const frontBackLength = Math.sqrt((width * width) + (heightDiff * heightDiff)); 
+                const frontBackGeo = new THREE.CylinderGeometry(0.03, 0.03, frontBackLength + 0.2, 16);
+                const frontBackAngle = Math.atan2(heightDiff, width); 
+
+                addMesh(frontBackGeo, materials.bracing, 0, yCenter, hD + 0.1, 0, 0, -(Math.PI/2 - frontBackAngle));
+                addMesh(frontBackGeo, materials.bracing, 0, yCenter, -hD - 0.1, 0, 0, (Math.PI/2 - frontBackAngle));
+
+                const fbClampRotZ1 = -(Math.PI/2 - frontBackAngle);
+                const fbClampRotZ2 = (Math.PI/2 - frontBackAngle);
+                addClamp(-hW, 0.3, hD + 0.05, 0, 0, fbClampRotZ1);  
+                addClamp(hW, 1.5, hD + 0.05, 0, 0, fbClampRotZ1);   
+                addClamp(-hW, 1.5, -hD - 0.05, 0, 0, fbClampRotZ2); 
+                addClamp(hW, 0.3, -hD - 0.05, 0, 0, fbClampRotZ2);  
+
+                const sideLength = Math.sqrt((depth * depth) + (heightDiff * heightDiff));
+                const sideGeo = new THREE.CylinderGeometry(0.03, 0.03, sideLength + 0.2, 16);
+                const sideAngle = Math.atan2(heightDiff, depth);
+
+                addMesh(sideGeo, materials.bracing, -hW - 0.1, yCenter, 0, -(Math.PI/2 - sideAngle), 0, 0);
+                addMesh(sideGeo, materials.bracing, hW + 0.1, yCenter, 0, (Math.PI/2 - sideAngle), 0, 0);
+
+                const sideClampRotX1 = -(Math.PI/2 - sideAngle);
+                const sideClampRotX2 = (Math.PI/2 - sideAngle);
+                addClamp(-hW - 0.05, 0.3, hD, sideClampRotX1, 0, 0);  
+                addClamp(-hW - 0.05, 1.5, -hD, sideClampRotX1, 0, 0); 
+                addClamp(hW + 0.05, 1.5, hD, sideClampRotX2, 0, 0);   
+                addClamp(hW + 0.05, 0.3, -hD, sideClampRotX2, 0, 0);  
+                
+                addLabelSprite(new THREE.Vector3(0, yCenter, hD + 0.35), '각도 40°~60°');
+                break;
+
+            case 'ladder':
+                const ladderXOffset = 0.5; 
+                const ladderZ = 0.65;      
+                const ladderHeight = 2.22; 
+                const ladderYCenter = ladderHeight / 2;
+                
+                const ladderRailGeo = new THREE.CylinderGeometry(0.025, 0.025, ladderHeight, 16);
+                addMesh(ladderRailGeo, materials.ladder, ladderXOffset - 0.25, ladderYCenter, ladderZ, 0, 0, 0);
+                addMesh(ladderRailGeo, materials.ladder, ladderXOffset + 0.25, ladderYCenter, ladderZ, 0, 0, 0);
+                
+                const rungGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.5, 16);
+                const numRungs = 6; 
+                for(let i=1; i<=numRungs; i++) {
+                    const rY = (2.0 / (numRungs + 1)) * i; 
+                    addMesh(rungGeo, materials.ladder, ladderXOffset, rY, ladderZ, 0, 0, Math.PI/2);
+                }
+
+                const hookDepth = (hD + 0.05) - ladderZ; 
+                const ladderHookTopGeo = new THREE.BoxGeometry(0.04, 0.02, hookDepth + 0.04); 
+                const ladderHookFrontGeo = new THREE.BoxGeometry(0.04, 0.08, 0.02); 
+                
+                addMesh(ladderHookTopGeo, materials.hook, ladderXOffset - 0.25, 1.54, ladderZ + hookDepth/2);
+                addMesh(ladderHookFrontGeo, materials.hook, ladderXOffset - 0.25, 1.49, hD + 0.07);
+                addMesh(ladderHookTopGeo, materials.hook, ladderXOffset + 0.25, 1.54, ladderZ + hookDepth/2);
+                addMesh(ladderHookFrontGeo, materials.hook, ladderXOffset + 0.25, 1.49, hD + 0.07);
+                
+                addDimension(new THREE.Vector3(ladderXOffset, 1.62, ladderZ), new THREE.Vector3(ladderXOffset, 2.22, ladderZ), '600mm 이상 돌출', new THREE.Vector3(0, 0, 1), 0.35);
+                break;
+
+            case 'platform':
+                const boardWidth = 0.45; 
+                const boardLength = 1.9; 
+                const boardThickness = 0.04;
+                const platY = 1.62; 
+                const hookY = 1.60; 
+
+                const zOffsets = [-0.46, 0, 0.46];
+
+                zOffsets.forEach(zOff => {
+                    if (zOff === 0.46) {
+                        const leftLength = 1.15;
+                        const leftGeo = new THREE.BoxGeometry(leftLength, boardThickness, boardWidth - 0.02);
+                        addMesh(leftGeo, materials.platform, -0.375, platY, zOff);
+
+                        const rightLength = 0.15;
+                        const rightGeo = new THREE.BoxGeometry(rightLength, boardThickness, boardWidth - 0.02);
+                        addMesh(rightGeo, materials.platform, 0.875, platY, zOff);
+
+                        const hatchLength = 0.58; 
+                        const hatchGeo = new THREE.BoxGeometry(hatchLength, boardThickness, boardWidth - 0.04);
+                        const hatchX = 0.5; 
+                        addMesh(hatchGeo, materials.platform, hatchX, platY, zOff);
+
+                        const handleGeo = new THREE.BoxGeometry(0.08, 0.01, 0.06);
+                        addMesh(handleGeo, materials.base, hatchX - 0.2, platY + 0.025, zOff); 
+                        
+                        const hingeGeo = new THREE.BoxGeometry(0.02, 0.015, 0.08);
+                        addMesh(hingeGeo, materials.base, 0.78, platY + 0.02, zOff - 0.1);
+                        addMesh(hingeGeo, materials.base, 0.78, platY + 0.02, zOff + 0.1);
+
+                    } else {
+                        const platGeo = new THREE.BoxGeometry(boardLength, boardThickness, boardWidth - 0.02);
+                        addMesh(platGeo, materials.platform, 0, platY, zOff);
+                    }
+
+                    const hookTopGeo = new THREE.BoxGeometry(0.15, 0.02, boardWidth - 0.02);
+                    const hookSideGeo = new THREE.BoxGeometry(0.02, 0.08, boardWidth - 0.02);
+                    
+                    addMesh(hookTopGeo, materials.hook, -1.025, hookY, zOff);
+                    addMesh(hookSideGeo, materials.hook, -1.1, hookY - 0.05, zOff);
+                    addMesh(hookTopGeo, materials.hook, 1.025, hookY, zOff);
+                    addMesh(hookSideGeo, materials.hook, 1.1, hookY - 0.05, zOff);
+                });
+                
+                addLabelSprite(new THREE.Vector3(0, platY + 0.25, 0), '틈새 30mm 이하');
+                break;
+
+            case 'guardrail':
+                const topY = 2.4; 
+                const midY = 2.0; 
+                const topYSide = 2.45;
+                const midYSide = 2.05;
+                
+                const frontBackRailGeo = new THREE.CylinderGeometry(0.03, 0.03, width + 0.2, 16);
+                addMesh(frontBackRailGeo, materials.guardrail, 0, topY, -hD + 0.05, 0, 0, Math.PI/2); 
+                addMesh(frontBackRailGeo, materials.guardrail, 0, midY, -hD + 0.05, 0, 0, Math.PI/2); 
+                addMesh(frontBackRailGeo, materials.guardrail, 0, topY, hD - 0.05, 0, 0, Math.PI/2);  
+                addMesh(frontBackRailGeo, materials.guardrail, 0, midY, hD - 0.05, 0, 0, Math.PI/2);  
+                
+                addClamp(-hW, topY, -hD + 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(hW, topY, -hD + 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(-hW, topY, hD - 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(hW, topY, hD - 0.025, Math.PI/4, Math.PI/4, 0);
+                
+                addClamp(-hW, midY, -hD + 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(hW, midY, -hD + 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(-hW, midY, hD - 0.025, Math.PI/4, Math.PI/4, 0);
+                addClamp(hW, midY, hD - 0.025, Math.PI/4, Math.PI/4, 0);
+
+                const sideRailGeo = new THREE.CylinderGeometry(0.03, 0.03, depth + 0.2, 16);
+                addMesh(sideRailGeo, materials.guardrail, -hW + 0.05, topYSide, 0, Math.PI/2, 0, 0); 
+                addMesh(sideRailGeo, materials.guardrail, -hW + 0.05, midYSide, 0, Math.PI/2, 0, 0); 
+                addMesh(sideRailGeo, materials.guardrail, hW - 0.05, topYSide, 0, Math.PI/2, 0, 0);  
+                addMesh(sideRailGeo, materials.guardrail, hW - 0.05, midYSide, 0, Math.PI/2, 0, 0);  
+
+                addClamp(-hW + 0.025, topYSide, -hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(hW - 0.025, topYSide, -hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(-hW + 0.025, topYSide, hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(hW - 0.025, topYSide, hD, Math.PI/4, 0, Math.PI/4);
+
+                addClamp(-hW + 0.025, midYSide, -hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(hW - 0.025, midYSide, -hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(-hW + 0.025, midYSide, hD, Math.PI/4, 0, Math.PI/4);
+                addClamp(hW - 0.025, midYSide, hD, Math.PI/4, 0, Math.PI/4);
+                
+                addDimension(new THREE.Vector3(-0.75, 1.62, hD), new THREE.Vector3(-0.75, midY, hD), '중간: 450~600mm', new THREE.Vector3(0, 0, 1), 0.35);
+                addDimension(new THREE.Vector3(0.75, 1.62, hD), new THREE.Vector3(0.75, topY, hD), '상부: 900~1200mm', new THREE.Vector3(0, 0, 1), 0.35);
+                break;
+        }
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        init3D();
+    } else {
+        window.addEventListener('DOMContentLoaded', init3D);
+    }
+</script>
+
+</body>
+</html>
